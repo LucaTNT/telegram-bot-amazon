@@ -1,0 +1,29 @@
+{
+  "name": "telegram-bot-amazon",
+  "version": "1.0.0",
+  "description": "Telegram bot to replace Amazon affiliate tags in links",
+  "main": "index.js",
+  "dependencies": {
+    "node-fetch": "^2.6.1",
+    "node-telegram-bot-api": "^0.50.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LucaTNT/telegram-bot-amazon.git"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "amazon"
+  ],
+  "author": "LucaTNT",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/LucaTNT/telegram-bot-amazon/issues"
+  },
+  "homepage": "https://github.com/LucaTNT/telegram-bot-amazon#readme"
+}
