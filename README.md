@@ -1,6 +1,5 @@
 This is a Telegram bot that, if made admin of a group, will delete any message
 containing an Amazon link and re-post it tagged with the specified affiliate tag.
-If contacted directly, 
 
 It takes two parameters as environment variables:
 
