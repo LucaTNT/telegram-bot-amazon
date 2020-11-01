@@ -21,6 +21,15 @@ if (!process.env.AMAZON_TAG) {
   process.exit(1)
 }
 
+var amazon_tld
+
+if (!process.env.AMAZON_TLD) {
+  console.log("Missing AMAZON_TLD env variable, using the default one (.com)")
+  amazon_tld = "com"
+} else {
+  amazon_tld = process.env.AMAZON_TLD
+}
+
 const token = process.env.TELEGRAM_BOT_TOKEN
 const amazon_tag = process.env.AMAZON_TAG
 const bot = new TelegramBot(token, {polling: true})
@@ -31,7 +40,7 @@ function log(msg) {
 }
 
 function buildAmazonUrl(asin) {
-  return "https://www.amazon.it/dp/" + asin + "?tag=" + amazon_tag
+  return "https://www.amazon." + amazon_tld + "/dp/" + asin + "?tag=" + amazon_tag
 }
 
 function buildMention(user) {
