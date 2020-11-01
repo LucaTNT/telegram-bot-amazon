@@ -38,17 +38,28 @@ function buildMention(user) {
   return user.username ? "@" + user.username : (user.first_name + (user.last_name ? " " + user.last_name : ""))
 }
 
-function buildMessage(message, fullURL, asin, user) {
-  return "Messaggio di " + buildMention(user) + " con link Amazon sponsorizzato:\n\n" + message.replace(fullURL, buildAmazonUrl(asin))
+function buildMessage(chat, message, fullURL, asin, user) {
+  return (isGroup(chat) ? ("Messaggio di " + buildMention(user) +
+                           " con link Amazon sponsorizzato:\n\n" +
+                           message.replace(fullURL, buildAmazonUrl(asin))) :
+                           buildAmazonUrl(asin))
+}
+
+function isGroup(chat) {
+  return (chat.type == "group" || chat.type == "supergroup")
 }
 
 function deleteAndSend(chat, messageId, text) {
   const chatId = chat.id
+  var deleted = false
 
-  if (chat.type == "group") {
+  if (isGroup(chat)) {
   	bot.deleteMessage(chatId, messageId)
+    deleted = true
   }
   bot.sendMessage(chatId, text)
+
+  return deleted
 }
 
 function getASINFromFullUrl(url) {
@@ -61,10 +72,10 @@ bot.onText(fullURLRegex, (msg, match) => {
   const asin = match[8];
   const fullURL = match[0];
 
-  text = buildMessage(msg.text, fullURL, asin, msg.from)
-  deleteAndSend(msg.chat, msg.message_id, text)
+  const text = buildMessage(msg.chat, msg.text, fullURL, asin, msg.from)
+  const deleted = deleteAndSend(msg.chat, msg.message_id, text)
 
-  log('Long URL ' + fullURL + ' -> ASIN ' + asin + ' from ' + buildMention(msg.from))
+  log('Long URL ' + fullURL + ' -> ASIN ' + asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
 });
 
 bot.onText(shortURLRegex, (msg, match) => {
@@ -73,10 +84,10 @@ bot.onText(shortURLRegex, (msg, match) => {
     const fullURL = res.headers.get('location')
 
     const asin = getASINFromFullUrl(fullURL)
-    text = buildMessage(msg.text, shortURL, asin, msg.from)
-    deleteAndSend(msg.chat, msg.message_id, text)
+    const text = buildMessage(chat, msg.text, shortURL, asin, msg.from)
+    const deleted = deleteAndSend(msg.chat, msg.message_id, text)
 
-    log('Short URL ' + shortURL + ' -> ASIN ' + asin + ' from ' + buildMention(msg.from))
+    log('Short URL ' + shortURL + ' -> ASIN ' + asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
   }).catch(err => {
     log('Short URL ' + shortURL + ' -> ERROR from ' + buildMention(msg.from))
   })
