@@ -21,6 +21,15 @@ if (!process.env.AMAZON_TAG) {
   process.exit(1)
 }
 
+var group_replacement_message
+
+if (!process.env.GROUP_REPLACEMENT_MESSAGE) {
+  console.log("Missing GROUP_REPLACEMENT_MESSAGE env variable, using the default one")
+  group_replacement_message = "Message by {USER} with Amazon affiliate link:\n\n{MESSAGE}"
+} else {
+  group_replacement_message = process.env.GROUP_REPLACEMENT_MESSAGE
+}
+
 var amazon_tld
 
 if (!process.env.AMAZON_TLD) {
@@ -48,9 +57,12 @@ function buildMention(user) {
 }
 
 function buildMessage(chat, message, fullURL, asin, user) {
-  return (isGroup(chat) ? ("Messaggio di " + buildMention(user) +
-                           " con link Amazon sponsorizzato:\n\n" +
-                           message.replace(fullURL, buildAmazonUrl(asin))) :
+  const affiliate_message = message.replace(fullURL, buildAmazonUrl(asin))
+  return (isGroup(chat) ? (group_replacement_message.replace(/\\n/g, '\n')
+                                                    .replace("{USER}", buildMention(user))
+                                                    .replace("{MESSAGE}", affiliate_message)
+                                                    .replace("{ORIGINAL_MESSAGE}", message)
+                                                    .replace("{AFFILIATE_LINK}", buildAmazonUrl(asin))) :
                            buildAmazonUrl(asin))
 }
 
