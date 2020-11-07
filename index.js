@@ -8,8 +8,8 @@ License: MIT
 const TelegramBot = require('node-telegram-bot-api');
 const fetch = require('node-fetch');
 
-const fullURLRegex = /https?:\/\/(www\.)?(.*)amazon\.([a-z\.]{2,5})(\/d\/(.*)|\/(.*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/i
-const shortURLRegex = /https?:\/\/(www\.)?(.*)amzn.to\/([0-9A-Za-z]+)/i
+const fullURLRegex = /https?:\/\/(www\.)?([^\s]*)amazon\.([a-z\.]{2,5})(\/d\/([^\s]*)|\/([^\s]*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/ig
+const shortURLRegex = /https?:\/\/(www\.)?([^\s]*)amzn.to\/([0-9A-Za-z]+)/ig
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.log("Missing TELEGRAM_BOT_TOKEN env variable")
@@ -56,14 +56,28 @@ function buildMention(user) {
   return user.username ? "@" + user.username : (user.first_name + (user.last_name ? " " + user.last_name : ""))
 }
 
-function buildMessage(chat, message, fullURL, asin, user) {
-  const affiliate_message = message.replace(fullURL, buildAmazonUrl(asin))
-  return (isGroup(chat) ? (group_replacement_message.replace(/\\n/g, '\n')
-                                                    .replace("{USER}", buildMention(user))
-                                                    .replace("{MESSAGE}", affiliate_message)
-                                                    .replace("{ORIGINAL_MESSAGE}", message)
-                                                    .replace("{AFFILIATE_LINK}", buildAmazonUrl(asin))) :
-                           buildAmazonUrl(asin))
+function buildMessage(chat, message, replacements, user) {
+  if (isGroup(chat)) {
+    var affiliate_message = message
+    replacements.forEach(element => {
+      affiliate_message = affiliate_message.replace(element.fullURL, buildAmazonUrl(element.asin))
+    })
+    return group_replacement_message.replace(/\\n/g, '\n')
+                                    .replace("{USER}", buildMention(user))
+                                    .replace("{MESSAGE}", affiliate_message)
+                                    .replace("{ORIGINAL_MESSAGE}", message)
+  } else {
+    var text = ""
+    if (replacements.length > 1) {
+      replacements.forEach(element => {
+        text += "• " + buildAmazonUrl(element.asin) + "\n"
+      })
+    } else {
+      text = buildAmazonUrl(replacements[0].asin)
+    }
+
+    return text
+  }
 }
 
 function isGroup(chat) {
@@ -84,32 +98,69 @@ function deleteAndSend(chat, messageId, text) {
 }
 
 function getASINFromFullUrl(url) {
-  const match = url.match(fullURLRegex)
+  const match = fullURLRegex.exec(url)
 
   return match[8]
 }
 
-bot.onText(fullURLRegex, (msg, match) => {
-  const asin = match[8];
-  const fullURL = match[0];
-
-  const text = buildMessage(msg.chat, msg.text, fullURL, asin, msg.from)
-  const deleted = deleteAndSend(msg.chat, msg.message_id, text)
-
-  log('Long URL ' + fullURL + ' -> ASIN ' + asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
-});
-
-bot.onText(shortURLRegex, (msg, match) => {
-  const shortURL = match[0];
-  fetch(shortURL, {redirect: 'manual'}).then(res => {
-    const fullURL = res.headers.get('location')
-
-    const asin = getASINFromFullUrl(fullURL)
-    const text = buildMessage(chat, msg.text, shortURL, asin, msg.from)
-    const deleted = deleteAndSend(msg.chat, msg.message_id, text)
-
-    log('Short URL ' + shortURL + ' -> ASIN ' + asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
-  }).catch(err => {
-    log('Short URL ' + shortURL + ' -> ERROR from ' + buildMention(msg.from))
+function getLongUrl(shortURL) {
+  return new Promise((resolve, reject) => {
+    fetch(shortURL, {redirect: 'manual'}).then(res => {
+      console.log(shortURL)
+      resolve({fullURL: res.headers.get('location'), shortURL: shortURL})
+    }).catch(err => {
+      reject('Short URL ' + shortURL + ' -> ERROR from ' + buildMention(msg.from))
+      console.log(err)
+    })
   })
-});
+}
+
+bot.on('message', (msg) => {
+  try {
+    fullURLRegex.lastIndex = 0
+    shortURLRegex.lastIndex = 0
+
+    var replacements = []
+    while ((match = fullURLRegex.exec(msg.text)) !== null) {
+      const asin = match[8];
+      const fullURL = match[0];
+      replacements.push({asin: asin, fullURL: fullURL})
+    }
+
+    var promises = []
+    while ((match = shortURLRegex.exec(msg.text)) !== null) {
+      const shortURL = match[0]
+
+      promises.push(getLongUrl(shortURL))
+    }
+
+    Promise.all(promises).then(fullURLs => {
+      if (promises.length == 0) {
+        return
+      }
+      fullURLs.forEach(element => {
+        const asin = getASINFromFullUrl(element.fullURL)
+        replacements.push({asin: asin, fullURL: element.shortURL})
+      })
+    }).then(_ => {
+      console.log("second then")
+      if (replacements.length > 0) {
+        const text = buildMessage(msg.chat, msg.text, replacements, msg.from)
+        const deleted = deleteAndSend(msg.chat, msg.message_id, text)
+
+        if (replacements.length > 1) {
+          replacements.forEach(element => {
+            log('Long URL ' + element.fullURL + ' -> ASIN ' + element.asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
+          })
+        } else {
+          log('Long URL ' + replacements[0].fullURL + ' -> ASIN ' + replacements[0].asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
+        }
+      }
+    }).catch(e => {console.log("Rejected promise"); console.log(e)})
+
+  } catch (e) {
+    log("ERROR, please file a bug report at https://github.com/LucaTNT/telegram-bot-amazon")
+    console.log(e)
+  }
+})
+

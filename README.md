@@ -22,7 +22,6 @@ You can set two optional parameters through environment variables:
 | `{USER}`             | The user that posted the message, as `@username` if they created a Telegram username, as `first_name last_name` otherwise. |
 | `{ORIGINAL_MESSAGE}` | The user's original message, with no replacements (so it will contain the non-affiliated Amazon link).                     |
 | `{MESSAGE}`          | The user's message, with the affiliated Amazon link the bot created.                                                       |
-| `{AFFILIATE_LINK}`   | Just the affiliate link                                                                                                    |
 
 ## Running the app
 
