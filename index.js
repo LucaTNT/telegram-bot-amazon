@@ -106,7 +106,6 @@ function getASINFromFullUrl(url) {
 function getLongUrl(shortURL) {
   return new Promise((resolve, reject) => {
     fetch(shortURL, {redirect: 'manual'}).then(res => {
-      console.log(shortURL)
       resolve({fullURL: res.headers.get('location'), shortURL: shortURL})
     }).catch(err => {
       reject('Short URL ' + shortURL + ' -> ERROR from ' + buildMention(msg.from))
@@ -143,7 +142,6 @@ bot.on('message', (msg) => {
         replacements.push({asin: asin, fullURL: element.shortURL})
       })
     }).then(_ => {
-      console.log("second then")
       if (replacements.length > 0) {
         const text = buildMessage(msg.chat, msg.text, replacements, msg.from)
         const deleted = deleteAndSend(msg.chat, msg.message_id, text)
