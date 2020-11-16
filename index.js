@@ -21,6 +21,13 @@ if (!process.env.AMAZON_TAG) {
   process.exit(1)
 }
 
+const shorten_links = (process.env.SHORTEN_LINKS && process.env.SHORTEN_LINKS == "true")
+const bitly_token = process.env.BITLY_TOKEN
+if (shorten_links && !bitly_token) {
+  console.log("Missing BITLY_TOKEN env variable (required when SHORTEN_LINKS is true)")
+  process.exit(1)
+}
+
 var group_replacement_message
 
 if (!process.env.GROUP_REPLACEMENT_MESSAGE) {
@@ -48,20 +55,44 @@ function log(msg) {
   console.log(date + " " + msg)
 }
 
+async function shortenURL(asin) {
+  const headers = {"Authorization": `Bearer ${bitly_token}`, "Content-Type": "application/json"}
+  const body = {"long_url": buildAmazonUrl(asin), domain: "bit.ly"}
+  try {
+    const res = await fetch("https://api-ssl.bitly.com/v4/shorten", {method: "post", headers: headers, body: JSON.stringify(body)})
+    const result = await res.json()
+    if (result.link) {
+      return result.link
+    } else {
+      log("Error in bitly response " + JSON.stringify(result))
+      return buildAmazonUrl(asin)
+    }
+  } catch(err) {
+    log(`Error in bitly response ${err}`)
+    return buildAmazonUrl(asin)
+  }
+}
+
 function buildAmazonUrl(asin) {
-  return "https://www.amazon." + amazon_tld + "/dp/" + asin + "?tag=" + amazon_tag
+  return `https://www.amazon.${amazon_tld}/dp/${asin}?tag=${amazon_tag}`
+}
+
+async function getAmazonURL(asin) {
+  return (shorten_links ? (await shortenURL(asin)) : buildAmazonUrl(asin))
 }
 
 function buildMention(user) {
   return user.username ? "@" + user.username : (user.first_name + (user.last_name ? " " + user.last_name : ""))
 }
 
-function buildMessage(chat, message, replacements, user) {
+async function buildMessage(chat, message, replacements, user) {
   if (isGroup(chat)) {
     var affiliate_message = message
-    replacements.forEach(element => {
-      affiliate_message = affiliate_message.replace(element.fullURL, buildAmazonUrl(element.asin))
-    })
+    for await (const element of replacements) {
+      const sponsored_url = await getAmazonURL(element.asin)
+      affiliate_message = affiliate_message.replace(element.fullURL, sponsored_url)
+    }
+
     return group_replacement_message.replace(/\\n/g, '\n')
                                     .replace("{USER}", buildMention(user))
                                     .replace("{MESSAGE}", affiliate_message)
@@ -69,11 +100,11 @@ function buildMessage(chat, message, replacements, user) {
   } else {
     var text = ""
     if (replacements.length > 1) {
-      replacements.forEach(element => {
-        text += "• " + buildAmazonUrl(element.asin) + "\n"
-      })
+      for await (const element of replacements) {
+        text += "• " + (await getAmazonURL(element.asin)) + "\n"
+      }
     } else {
-      text = buildAmazonUrl(replacements[0].asin)
+      text = await getAmazonURL(replacements[0].asin)
     }
 
     return text
@@ -103,18 +134,17 @@ function getASINFromFullUrl(url) {
   return match[8]
 }
 
-function getLongUrl(shortURL) {
-  return new Promise((resolve, reject) => {
-    fetch(shortURL, {redirect: 'manual'}).then(res => {
-      resolve({fullURL: res.headers.get('location'), shortURL: shortURL})
-    }).catch(err => {
-      reject('Short URL ' + shortURL + ' -> ERROR from ' + buildMention(msg.from))
-      console.log(err)
-    })
-  })
+async function getLongUrl(shortURL) {
+  try {
+    let res = await fetch(shortURL, {redirect: 'manual'})
+    return ({fullURL: res.headers.get('location'), shortURL: shortURL})
+  } catch (err) {
+    log('Short URL ' + shortURL + ' -> ERROR from ' + buildMention(msg.from))
+    return shortURL
+  }
 }
 
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
   try {
     fullURLRegex.lastIndex = 0
     shortURLRegex.lastIndex = 0
@@ -126,36 +156,26 @@ bot.on('message', (msg) => {
       replacements.push({asin: asin, fullURL: fullURL})
     }
 
-    var promises = []
     while ((match = shortURLRegex.exec(msg.text)) !== null) {
       const shortURL = match[0]
-
-      promises.push(getLongUrl(shortURL))
+      fullURLRegex.lastIndex = 0 // Otherwise sometimes getASINFromFullUrl won't succeed
+      const url = await getLongUrl(shortURL)
+      const asin = getASINFromFullUrl(url.fullURL)
+      replacements.push({asin: asin, fullURL: shortURL})
     }
 
-    Promise.all(promises).then(fullURLs => {
-      if (promises.length == 0) {
-        return
-      }
-      fullURLs.forEach(element => {
-        const asin = getASINFromFullUrl(element.fullURL)
-        replacements.push({asin: asin, fullURL: element.shortURL})
-      })
-    }).then(_ => {
-      if (replacements.length > 0) {
-        const text = buildMessage(msg.chat, msg.text, replacements, msg.from)
-        const deleted = deleteAndSend(msg.chat, msg.message_id, text)
+    if (replacements.length > 0) {
+      const text = await buildMessage(msg.chat, msg.text, replacements, msg.from)
+      const deleted = deleteAndSend(msg.chat, msg.message_id, text)
 
-        if (replacements.length > 1) {
-          replacements.forEach(element => {
-            log('Long URL ' + element.fullURL + ' -> ASIN ' + element.asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
-          })
-        } else {
-          log('Long URL ' + replacements[0].fullURL + ' -> ASIN ' + replacements[0].asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
-        }
+      if (replacements.length > 1) {
+        replacements.forEach(element => {
+          log('Long URL ' + element.fullURL + ' -> ASIN ' + element.asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
+        })
+      } else {
+        log('Long URL ' + replacements[0].fullURL + ' -> ASIN ' + replacements[0].asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
       }
-    }).catch(e => {console.log("Rejected promise"); console.log(e)})
-
+    }
   } catch (e) {
     log("ERROR, please file a bug report at https://github.com/LucaTNT/telegram-bot-amazon")
     console.log(e)
