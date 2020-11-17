@@ -9,8 +9,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const fetch = require('node-fetch');
 const urlParser = require('url');
 
-const fullURLRegex = /https?:\/\/(www\.)?([^\s]*)amazon\.([a-z\.]{2,5})(\/d\/([^\s]*)|\/([^\s]*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/ig
-const shortURLRegex = /https?:\/\/(www\.)?([^\s]*)amzn.to\/([0-9A-Za-z]+)/ig
+const fullURLRegex = /https?:\/\/(([^\s]*)\.)?amazon\.([a-z\.]{2,5})(\/d\/([^\s]*)|\/([^\s]*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/ig
+const shortURLRegex = /https?:\/\/(([^\s]*)\.)?amzn\.to\/([0-9A-Za-z]+)/ig
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.log("Missing TELEGRAM_BOT_TOKEN env variable")
@@ -51,7 +51,7 @@ if (!process.env.AMAZON_TLD) {
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 const amazon_tag = process.env.AMAZON_TAG
-const rawUrlRegex = new RegExp(`https?:\/\/(www\.)?([^\\s]*)amazon\.${amazon_tld}\/?([^\\s]*)`, "ig")
+const rawUrlRegex = new RegExp(`https?:\/\/(([^\\s]*)\\.)?amazon\\.${amazon_tld}\/?([^\\s]*)`, "ig")
 
 const bot = new TelegramBot(token, {polling: true})
 
@@ -145,7 +145,7 @@ function deleteAndSend(chat, messageId, text) {
 function getASINFromFullUrl(url) {
   const match = fullURLRegex.exec(url)
 
-  return match[8]
+  return (match != null ? match[8] : url)
 }
 
 async function getLongUrl(shortURL) {
@@ -153,13 +153,14 @@ async function getLongUrl(shortURL) {
     let res = await fetch(shortURL, {redirect: 'manual'})
     return ({fullURL: res.headers.get('location'), shortURL: shortURL})
   } catch (err) {
-    log('Short URL ' + shortURL + ' -> ERROR from ' + buildMention(msg.from))
-    return shortURL
+    log('Short URL ' + shortURL + ' -> ERROR')
+    return null
   }
 }
 
 bot.on('message', async (msg) => {
   try {
+    shortURLRegex.lastIndex = 0
     var replacements = []
     if (raw_links) {
       rawUrlRegex.lastIndex = 0
@@ -171,7 +172,6 @@ bot.on('message', async (msg) => {
       }
     } else {
       fullURLRegex.lastIndex = 0
-      shortURLRegex.lastIndex = 0
 
       while ((match = fullURLRegex.exec(msg.text)) !== null) {
         const asin = match[8];
@@ -184,10 +184,14 @@ bot.on('message', async (msg) => {
       const shortURL = match[0]
       fullURLRegex.lastIndex = 0 // Otherwise sometimes getASINFromFullUrl won't succeed
       const url = await getLongUrl(shortURL)
-      if (raw_links) {
-        replacements.push({asin: null, expanded_url: url.fullURL, fullURL: shortURL})
-      } else {
-        replacements.push({asin: getASINFromFullUrl(url.fullURL), fullURL: shortURL})
+
+      if (url != null)
+      {
+        if (raw_links) {
+          replacements.push({asin: null, expanded_url: url.fullURL, fullURL: shortURL})
+        } else {
+          replacements.push({asin: getASINFromFullUrl(url.fullURL), fullURL: shortURL})
+        }
       }
     }
 
