@@ -18,6 +18,7 @@ You can set two optional parameters through environment variables:
 * `BITLY_TOKEN` (required if `SHORTEN_LINKS` is `"true"`) is the [Generic Access Token](https://bitly.is/accesstoken) you can get from bitly.
 * `AMAZON_TLD` is the Amazon TLD for affiliate links (it defaults to "com", but you can set it to "it", "de", "fr" or whatever).
 * `GROUP_REPLACEMENT_MESSAGE` specifies the format for the message that gets posted to groups after deleting the original one. If not set, it will default to `Message by {USER} with Amazon affiliate link:\n\n{MESSAGE}`. In the following table you'll find variables you can use.
+* `RAW_LINKS`: if set to `"true"` disables this bot's "URL beautifier" (which removes all the URL parameters aside from the ASIN and the affiliate tag) and just adds/replaces the tag to the URL. This allows to link to arbitrary pages on Amazon, even non-product ones (e.g. search pages, category pages, etc.)
 
 | String               | Replacement                                                                                                                |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------- |

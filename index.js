@@ -7,9 +7,10 @@ License: MIT
 
 const TelegramBot = require('node-telegram-bot-api');
 const fetch = require('node-fetch');
+const urlParser = require('url');
 
-const fullURLRegex = /https?:\/\/(www\.)?([^\s]*)amazon\.([a-z\.]{2,5})(\/d\/([^\s]*)|\/([^\s]*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/ig
-const shortURLRegex = /https?:\/\/(www\.)?([^\s]*)amzn.to\/([0-9A-Za-z]+)/ig
+const fullURLRegex = /https?:\/\/(([^\s]*)\.)?amazon\.([a-z\.]{2,5})(\/d\/([^\s]*)|\/([^\s]*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/ig
+const shortURLRegex = /https?:\/\/(([^\s]*)\.)?amzn\.to\/([0-9A-Za-z]+)/ig
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.log("Missing TELEGRAM_BOT_TOKEN env variable")
@@ -27,6 +28,8 @@ if (shorten_links && !bitly_token) {
   console.log("Missing BITLY_TOKEN env variable (required when SHORTEN_LINKS is true)")
   process.exit(1)
 }
+
+const raw_links = (process.env.RAW_LINKS && process.env.RAW_LINKS == "true")
 
 var group_replacement_message
 
@@ -48,6 +51,8 @@ if (!process.env.AMAZON_TLD) {
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 const amazon_tag = process.env.AMAZON_TAG
+const rawUrlRegex = new RegExp(`https?:\/\/(([^\\s]*)\\.)?amazon\\.${amazon_tld}\/?([^\\s]*)`, "ig")
+
 const bot = new TelegramBot(token, {polling: true})
 
 function log(msg) {
@@ -55,9 +60,9 @@ function log(msg) {
   console.log(date + " " + msg)
 }
 
-async function shortenURL(asin) {
+async function shortenURL(url) {
   const headers = {"Authorization": `Bearer ${bitly_token}`, "Content-Type": "application/json"}
-  const body = {"long_url": buildAmazonUrl(asin), domain: "bit.ly"}
+  const body = {"long_url": url, domain: "bit.ly"}
   try {
     const res = await fetch("https://api-ssl.bitly.com/v4/shorten", {method: "post", headers: headers, body: JSON.stringify(body)})
     const result = await res.json()
@@ -65,11 +70,11 @@ async function shortenURL(asin) {
       return result.link
     } else {
       log("Error in bitly response " + JSON.stringify(result))
-      return buildAmazonUrl(asin)
+      return url
     }
   } catch(err) {
     log(`Error in bitly response ${err}`)
-    return buildAmazonUrl(asin)
+    return url
   }
 }
 
@@ -77,8 +82,17 @@ function buildAmazonUrl(asin) {
   return `https://www.amazon.${amazon_tld}/dp/${asin}?tag=${amazon_tag}`
 }
 
-async function getAmazonURL(asin) {
-  return (shorten_links ? (await shortenURL(asin)) : buildAmazonUrl(asin))
+function buildRawAmazonUrl(element) {
+  const url = (element.expanded_url ? element.expanded_url : element.fullURL)
+  const strucutredURL = new URL(url)
+  strucutredURL.searchParams.set("tag", amazon_tag)
+
+  return strucutredURL.toString()
+}
+
+async function getAmazonURL(element) {
+  const url = (element.asin != null ? buildAmazonUrl(element.asin) : buildRawAmazonUrl(element))
+  return (shorten_links ? (await shortenURL(url)) : url)
 }
 
 function buildMention(user) {
@@ -89,7 +103,7 @@ async function buildMessage(chat, message, replacements, user) {
   if (isGroup(chat)) {
     var affiliate_message = message
     for await (const element of replacements) {
-      const sponsored_url = await getAmazonURL(element.asin)
+      const sponsored_url = await getAmazonURL(element)
       affiliate_message = affiliate_message.replace(element.fullURL, sponsored_url)
     }
 
@@ -101,10 +115,10 @@ async function buildMessage(chat, message, replacements, user) {
     var text = ""
     if (replacements.length > 1) {
       for await (const element of replacements) {
-        text += "• " + (await getAmazonURL(element.asin)) + "\n"
+        text += "• " + (await getAmazonURL(element)) + "\n"
       }
     } else {
-      text = await getAmazonURL(replacements[0].asin)
+      text = await getAmazonURL(replacements[0])
     }
 
     return text
@@ -131,7 +145,7 @@ function deleteAndSend(chat, messageId, text) {
 function getASINFromFullUrl(url) {
   const match = fullURLRegex.exec(url)
 
-  return match[8]
+  return (match != null ? match[8] : url)
 }
 
 async function getLongUrl(shortURL) {
@@ -139,29 +153,46 @@ async function getLongUrl(shortURL) {
     let res = await fetch(shortURL, {redirect: 'manual'})
     return ({fullURL: res.headers.get('location'), shortURL: shortURL})
   } catch (err) {
-    log('Short URL ' + shortURL + ' -> ERROR from ' + buildMention(msg.from))
-    return shortURL
+    log('Short URL ' + shortURL + ' -> ERROR')
+    return null
   }
 }
 
 bot.on('message', async (msg) => {
   try {
-    fullURLRegex.lastIndex = 0
     shortURLRegex.lastIndex = 0
-
     var replacements = []
-    while ((match = fullURLRegex.exec(msg.text)) !== null) {
-      const asin = match[8];
-      const fullURL = match[0];
-      replacements.push({asin: asin, fullURL: fullURL})
+    if (raw_links) {
+      rawUrlRegex.lastIndex = 0
+
+      while ((match = rawUrlRegex.exec(msg.text)) !== null) {
+        const fullURL = match[0];
+
+        replacements.push({asin: null, fullURL: fullURL})
+      }
+    } else {
+      fullURLRegex.lastIndex = 0
+
+      while ((match = fullURLRegex.exec(msg.text)) !== null) {
+        const asin = match[8];
+        const fullURL = match[0];
+        replacements.push({asin: asin, fullURL: fullURL})
+      }
     }
 
     while ((match = shortURLRegex.exec(msg.text)) !== null) {
       const shortURL = match[0]
       fullURLRegex.lastIndex = 0 // Otherwise sometimes getASINFromFullUrl won't succeed
       const url = await getLongUrl(shortURL)
-      const asin = getASINFromFullUrl(url.fullURL)
-      replacements.push({asin: asin, fullURL: shortURL})
+
+      if (url != null)
+      {
+        if (raw_links) {
+          replacements.push({asin: null, expanded_url: url.fullURL, fullURL: shortURL})
+        } else {
+          replacements.push({asin: getASINFromFullUrl(url.fullURL), fullURL: shortURL})
+        }
+      }
     }
 
     if (replacements.length > 0) {
