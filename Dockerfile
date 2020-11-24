@@ -4,7 +4,7 @@ COPY . /app
 
 WORKDIR /app
 
-RUN npm i
+RUN npm i --only=prod
 
 FROM node:15-alpine
 
