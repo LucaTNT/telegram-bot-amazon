@@ -53,6 +53,26 @@ const token = process.env.TELEGRAM_BOT_TOKEN
 const amazon_tag = process.env.AMAZON_TAG
 const rawUrlRegex = new RegExp(`https?:\/\/(([^\\s]*)\\.)?amazon\\.${amazon_tld}\/?([^\\s]*)`, "ig")
 
+var usernames_to_ignore = []
+var user_ids_to_ignore = []
+
+if (process.env.IGNORE_USERS) {
+  const usernameRegex = /@([^\s]+)/ig
+  const userIdRegex = /([0-9]+)/ig
+  let to_ignore = process.env.IGNORE_USERS.split(",")
+  to_ignore.forEach(ignore => {
+    let usernameResult = usernameRegex.exec(ignore.trim())
+    if (usernameResult) {
+      usernames_to_ignore.push(usernameResult[1].toLowerCase())
+    } else {
+      let userIdResult = userIdRegex.exec(ignore.trim())
+      if (userIdResult) {
+        user_ids_to_ignore.push(parseInt(userIdResult[1]))
+      }
+    }
+  })
+}
+
 const bot = new TelegramBot(token, {polling: true})
 
 function log(msg) {
@@ -160,52 +180,58 @@ async function getLongUrl(shortURL) {
 
 bot.on('message', async (msg) => {
   try {
-    shortURLRegex.lastIndex = 0
-    var replacements = []
-    if (raw_links) {
-      rawUrlRegex.lastIndex = 0
+    let from_username = msg.from.username.toLowerCase()
+    let from_id = msg.from.id
+    if (!usernames_to_ignore.includes(from_username) && !user_ids_to_ignore.includes(from_id)) {
+      shortURLRegex.lastIndex = 0
+      var replacements = []
+      if (raw_links) {
+        rawUrlRegex.lastIndex = 0
 
-      while ((match = rawUrlRegex.exec(msg.text)) !== null) {
-        const fullURL = match[0];
+        while ((match = rawUrlRegex.exec(msg.text)) !== null) {
+          const fullURL = match[0];
 
-        replacements.push({asin: null, fullURL: fullURL})
-      }
-    } else {
-      fullURLRegex.lastIndex = 0
+          replacements.push({asin: null, fullURL: fullURL})
+        }
+      } else {
+        fullURLRegex.lastIndex = 0
 
-      while ((match = fullURLRegex.exec(msg.text)) !== null) {
-        const asin = match[8];
-        const fullURL = match[0];
-        replacements.push({asin: asin, fullURL: fullURL})
-      }
-    }
-
-    while ((match = shortURLRegex.exec(msg.text)) !== null) {
-      const shortURL = match[0]
-      fullURLRegex.lastIndex = 0 // Otherwise sometimes getASINFromFullUrl won't succeed
-      const url = await getLongUrl(shortURL)
-
-      if (url != null)
-      {
-        if (raw_links) {
-          replacements.push({asin: null, expanded_url: url.fullURL, fullURL: shortURL})
-        } else {
-          replacements.push({asin: getASINFromFullUrl(url.fullURL), fullURL: shortURL})
+        while ((match = fullURLRegex.exec(msg.text)) !== null) {
+          const asin = match[8];
+          const fullURL = match[0];
+          replacements.push({asin: asin, fullURL: fullURL})
         }
       }
-    }
 
-    if (replacements.length > 0) {
-      const text = await buildMessage(msg.chat, msg.text, replacements, msg.from)
-      const deleted = deleteAndSend(msg.chat, msg.message_id, text)
+      while ((match = shortURLRegex.exec(msg.text)) !== null) {
+        const shortURL = match[0]
+        fullURLRegex.lastIndex = 0 // Otherwise sometimes getASINFromFullUrl won't succeed
+        const url = await getLongUrl(shortURL)
 
-      if (replacements.length > 1) {
-        replacements.forEach(element => {
-          log('Long URL ' + element.fullURL + ' -> ASIN ' + element.asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
-        })
-      } else {
-        log('Long URL ' + replacements[0].fullURL + ' -> ASIN ' + replacements[0].asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
+        if (url != null)
+        {
+          if (raw_links) {
+            replacements.push({asin: null, expanded_url: url.fullURL, fullURL: shortURL})
+          } else {
+            replacements.push({asin: getASINFromFullUrl(url.fullURL), fullURL: shortURL})
+          }
+        }
       }
+
+      if (replacements.length > 0) {
+        const text = await buildMessage(msg.chat, msg.text, replacements, msg.from)
+        const deleted = deleteAndSend(msg.chat, msg.message_id, text)
+
+        if (replacements.length > 1) {
+          replacements.forEach(element => {
+            log('Long URL ' + element.fullURL + ' -> ASIN ' + element.asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
+          })
+        } else {
+          log('Long URL ' + replacements[0].fullURL + ' -> ASIN ' + replacements[0].asin + ' from ' + buildMention(msg.from) + (deleted ? " (original message deleted)" : ""))
+        }
+      }
+    } else {
+      log(`Ignored message from ${buildMention(msg.from)} because it is included in the IGNORE_USERS env variable`)
     }
   } catch (e) {
     log("ERROR, please file a bug report at https://github.com/LucaTNT/telegram-bot-amazon")
