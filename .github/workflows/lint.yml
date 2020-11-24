@@ -16,8 +16,10 @@ jobs:
         with:
           node-version: 12
 
-      # ESLint and Prettier must be in `package.json`
-      - name: Install Node.js dependencies
+      - name: Install linting dependencies
+        run: npm install eslint prettier
+
+      - name: Install package dependencies
         run: npm install
 
       - name: Run linters
