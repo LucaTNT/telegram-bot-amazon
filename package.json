@@ -7,7 +7,10 @@
     "node-fetch": "^2.6.1",
     "node-telegram-bot-api": "^0.50.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "eslint": "^7.14.0",
+    "prettier": "^2.2.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
