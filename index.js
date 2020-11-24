@@ -7,9 +7,8 @@ License: MIT
 
 const TelegramBot = require('node-telegram-bot-api');
 const fetch = require('node-fetch');
-const urlParser = require('url');
 
-const fullURLRegex = /https?:\/\/(([^\s]*)\.)?amazon\.([a-z\.]{2,5})(\/d\/([^\s]*)|\/([^\s]*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/ig
+const fullURLRegex = /https?:\/\/(([^\s]*)\.)?amazon\.([a-z.]{2,5})(\/d\/([^\s]*)|\/([^\s]*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/ig
 const shortURLRegex = /https?:\/\/(([^\s]*)\.)?amzn\.to\/([0-9A-Za-z]+)/ig
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
@@ -51,7 +50,7 @@ if (!process.env.AMAZON_TLD) {
 
 const token = process.env.TELEGRAM_BOT_TOKEN
 const amazon_tag = process.env.AMAZON_TAG
-const rawUrlRegex = new RegExp(`https?:\/\/(([^\\s]*)\\.)?amazon\\.${amazon_tld}\/?([^\\s]*)`, "ig")
+const rawUrlRegex = new RegExp(`https?://(([^\\s]*)\\.)?amazon\\.${amazon_tld}/?([^\\s]*)`, "ig")
 
 const bot = new TelegramBot(token, {polling: true})
 
@@ -134,7 +133,7 @@ function deleteAndSend(chat, messageId, text) {
   var deleted = false
 
   if (isGroup(chat)) {
-  	bot.deleteMessage(chatId, messageId)
+    bot.deleteMessage(chatId, messageId)
     deleted = true
   }
   bot.sendMessage(chatId, text)
@@ -162,6 +161,7 @@ bot.on('message', async (msg) => {
   try {
     shortURLRegex.lastIndex = 0
     var replacements = []
+    var match
     if (raw_links) {
       rawUrlRegex.lastIndex = 0
 
