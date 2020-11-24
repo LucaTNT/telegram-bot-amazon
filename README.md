@@ -21,6 +21,7 @@ You can set two optional parameters through environment variables:
 * `AMAZON_TLD` is the Amazon TLD for affiliate links (it defaults to "com", but you can set it to "it", "de", "fr" or whatever).
 * `GROUP_REPLACEMENT_MESSAGE` specifies the format for the message that gets posted to groups after deleting the original one. If not set, it will default to `Message by {USER} with Amazon affiliate link:\n\n{MESSAGE}`. In the following table you'll find variables you can use.
 * `RAW_LINKS`: if set to `"true"` disables this bot's "URL beautifier" (which removes all the URL parameters aside from the ASIN and the affiliate tag) and just adds/replaces the tag to the URL. This allows to link to arbitrary pages on Amazon, even non-product ones (e.g. search pages, category pages, etc.)
+* `IGNORE_USERS`: a comma-separated list of usernames (starting with the "@" character) and numeric user IDs whose messages won't be acted upon by the bot, even if they contain matching Amazon links. A valid list would be "@Yourusername,12345678,@IgnoreMeAsWell123". Numeric user IDs are useful for users who do not have Telegram user names defined. You can get yours by contacting [userinfobot](https://t.me/useridinfobot).
 
 | String               | Replacement                                                                                                                |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
