@@ -204,7 +204,9 @@ async function getLongUrl(shortURL) {
 
 bot.on("message", async (msg) => {
   try {
-    let from_username = msg.from.username.toLowerCase();
+    let from_username = msg.from.username
+      ? msg.from.username.toLowerCase()
+      : "";
     let from_id = msg.from.id;
     if (
       !usernames_to_ignore.includes(from_username) &&
