@@ -209,8 +209,9 @@ bot.on("message", async (msg) => {
       : "";
     let from_id = msg.from.id;
     if (
-      !usernames_to_ignore.includes(from_username) &&
-      !user_ids_to_ignore.includes(from_id)
+      (!usernames_to_ignore.includes(from_username) &&
+        !user_ids_to_ignore.includes(from_id)) ||
+      !isGroup(msg.chat)
     ) {
       shortURLRegex.lastIndex = 0;
       var replacements = [];
