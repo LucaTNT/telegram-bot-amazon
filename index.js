@@ -173,7 +173,9 @@ function isGroup(chat) {
   return chat.type == "group" || chat.type == "supergroup";
 }
 
-function deleteAndSend(chat, messageId, text) {
+function deleteAndSend(msg, text) {
+  const chat = msg.chat;
+  const messageId = msg.message_id;
   const chatId = chat.id;
   var deleted = false;
 
@@ -181,7 +183,11 @@ function deleteAndSend(chat, messageId, text) {
     bot.deleteMessage(chatId, messageId);
     deleted = true;
   }
-  bot.sendMessage(chatId, text);
+  const options = msg.reply_to_message
+    ? { reply_to_message_id: msg.reply_to_message.message_id }
+    : {};
+
+  bot.sendMessage(chatId, text, options);
 
   return deleted;
 }
@@ -262,7 +268,7 @@ bot.on("message", async (msg) => {
           replacements,
           msg.from
         );
-        const deleted = deleteAndSend(msg.chat, msg.message_id, text);
+        const deleted = deleteAndSend(msg, text);
 
         if (replacements.length > 1) {
           replacements.forEach((element) => {
