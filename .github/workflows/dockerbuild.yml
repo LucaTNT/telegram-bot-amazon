@@ -39,7 +39,7 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v6,linux/arm/v7,linux/ppc64le,linux/s390x
-          push: ${{ github.event_name == 'push tag' }}
+          push: ${{ github.ref != 'refs/heads/main' }} # Only on tag, not regular push
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
       - name: Update repo description
