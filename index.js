@@ -1,7 +1,7 @@
 /*
 telegram-bot-amazon
 
-Author: Luca Zorzi (@LucaTNT)
+Author: Luca Zorzi (@LucaTNT) | Nitesh Sahni(@nsniteshsahni)
 License: MIT
 */
 
@@ -10,6 +10,8 @@ const fetch = require("node-fetch");
 
 const fullURLRegex = /https?:\/\/(([^\s]*)\.)?amazon\.([a-z.]{2,5})(\/d\/([^\s]*)|\/([^\s]*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/gi;
 const shortURLRegex = /https?:\/\/(([^\s]*)\.)?amzn\.to\/([0-9A-Za-z]+)/gi;
+
+const channelName = process.env.CHANNEL_NAME;
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.log("Missing TELEGRAM_BOT_TOKEN env variable");
@@ -188,8 +190,17 @@ function deleteAndSend(msg, text) {
     : {};
 
   bot.sendMessage(chatId, text, options);
-
+  sendMessageToChannel(text,options);
   return deleted;
+}
+
+function sendMessageToChannel(text, options){
+   if(!channelName){
+    console.log("Missing CHANNEL_NAME env variable");
+    process.exit(1);
+   }else{ 
+    bot.sendMessage("@"+channelName, text, options )
+   }
 }
 
 function getASINFromFullUrl(url) {
