@@ -164,7 +164,13 @@ async function buildMessage(chat, message, replacements, user) {
         text += "• " + (await getAmazonURL(element)) + "\n";
       }
     } else {
-      text = await getAmazonURL(replacements[0]);
+      const sponsored_url = await getAmazonURL(replacements[0]);
+      var affiliate_message = message;
+      affiliate_message = affiliate_message.replace(
+        shortURLRegex,
+        sponsored_url
+      );
+      text = affiliate_message;
     }
 
     return text;
@@ -187,10 +193,10 @@ function deleteAndSend(msg, text) {
   }
   const options = msg.reply_to_message
     ? { reply_to_message_id: msg.reply_to_message.message_id }
-    : {};
+    : {disable_web_page_preview:true};
 
   bot.sendMessage(chatId, text, options);
-  sendMessageToChannel(text,options);
+  sendMessageToChannel(text, options);
   return deleted;
 }
 
