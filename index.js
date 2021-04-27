@@ -116,7 +116,14 @@ async function shortenURL(url) {
 }
 
 function buildAmazonUrl(asin) {
-  return `https://www.amazon.${amazon_tld}/dp/${asin}?tag=${amazon_tag}`;
+  var amazonURL = `https://www.amazon.${amazon_tld}/dp/${asin}?tag=${amazon_tag}`;
+  
+  if(asin.toString().startsWith("https://")){ //if asin is actually an expanded URL
+    const strucutredURL = new URL(asin);
+    strucutredURL.searchParams.set("tag", amazon_tag);
+    amazonURL = strucutredURL.toString();
+  }
+  return amazonURL;
 }
 
 function buildRawAmazonUrl(element) {
@@ -158,10 +165,12 @@ async function buildMessage(chat, message, replacements, user) {
       .replace("{MESSAGE}", affiliate_message)
       .replace("{ORIGINAL_MESSAGE}", message);
   } else {
-    var text = "";
+    var text = message;
     if (replacements.length > 1) {
+      text = text.replace(shortURLRegex, "").trim();
+      text = text + "\n\n";
       for await (const element of replacements) {
-        text += "• " + (await getAmazonURL(element)) + "\n";
+        text += (await getAmazonURL(element)) + "\n\n";
       }
     } else {
       const sponsored_url = await getAmazonURL(replacements[0]);
@@ -173,7 +182,7 @@ async function buildMessage(chat, message, replacements, user) {
       text = affiliate_message;
     }
 
-    return text;
+    return text.trimEnd();
   }
 }
 
