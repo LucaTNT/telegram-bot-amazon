@@ -4,6 +4,7 @@
   "description": "Telegram bot to replace Amazon affiliate tags in links",
   "main": "index.js",
   "dependencies": {
+    "express": "^4.17.1",
     "node-fetch": "^2.6.1",
     "node-telegram-bot-api": "^0.51.0"
   },

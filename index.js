@@ -4,7 +4,7 @@ telegram-bot-amazon
 Author: Luca Zorzi (@LucaTNT) | Nitesh Sahni(@nsniteshsahni)
 License: MIT
 */
-
+const express = require('express');
 const TelegramBot = require("node-telegram-bot-api");
 const fetch = require("node-fetch");
 
@@ -12,6 +12,8 @@ const fullURLRegex = /https?:\/\/(([^\s]*)\.)?amazon\.([a-z.]{2,5})(\/d\/([^\s]*
 const shortURLRegex = /https?:\/\/(([^\s]*)\.)?amzn\.to\/([0-9A-Za-z]+)/gi;
 
 const channelName = process.env.CHANNEL_NAME;
+var port = process.env.PORT;
+const app = express();
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.log("Missing TELEGRAM_BOT_TOKEN env variable");
@@ -21,6 +23,10 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 if (!process.env.AMAZON_TAG) {
   console.log("Missing AMAZON_TAG env variable");
   process.exit(1);
+}
+
+if(!port){
+  port=3030
 }
 
 const shorten_links =
@@ -84,6 +90,9 @@ if (process.env.IGNORE_USERS) {
 }
 
 const bot = new TelegramBot(token, { polling: true });
+app.listen(port, ()=>{
+  console.log('listening on port: ${port}')
+});
 
 function log(msg) {
   const date = new Date().toISOString().replace(/T/, " ").replace(/\..+/, "");
