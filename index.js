@@ -208,6 +208,33 @@ async function getLongUrl(shortURL) {
   }
 }
 
+function replaceTextLinks(msg) {
+  if (msg.entities) {
+    var offset_shift = 0;
+    msg.entities.forEach((entity) => {
+      if (entity.type == "text_link") {
+        let offset = entity.offset + offset_shift;
+        let length = entity.length;
+
+        var new_text = "";
+
+        if (offset > 0) {
+          new_text += msg.text.substring(0, offset);
+        }
+
+        new_text += entity.url;
+        offset_shift = entity.url.length - length;
+
+        new_text += msg.text.substring(offset + length)
+
+        msg.text = new_text;
+      }
+    })
+
+    return msg.text;
+  }
+}
+
 bot.on("message", async (msg) => {
   try {
     let from_username = msg.from.username
@@ -219,6 +246,7 @@ bot.on("message", async (msg) => {
         !user_ids_to_ignore.includes(from_id)) ||
       !isGroup(msg.chat)
     ) {
+      msg.text = replaceTextLinks(msg)
       shortURLRegex.lastIndex = 0;
       var replacements = [];
       var match;
