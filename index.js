@@ -194,7 +194,11 @@ function deleteAndSend(msg, text) {
     ? { reply_to_message_id: msg.reply_to_message.message_id }
     : {};
 
-  bot.sendMessage(chatId, text, options);
+  if (msg.captionSavedAsText && isGroup(chat)) {
+    bot.sendPhoto(chatId, msg.photo[0].file_id, { ...options, caption: text });
+  } else {
+    bot.sendMessage(chatId, text, options);
+  }
 
   return deleted;
 }
@@ -274,6 +278,9 @@ bot.on("message", async (msg) => {
       !isGroup(msg.chat)
     ) {
       msg.text = replaceTextLinks(msg);
+
+      msg.text = msg.text || msg.caption;
+      msg.captionSavedAsText = msg.text == msg.caption;
 
       if (check_for_redirects) {
         URLRegex.lastIndex = 0;
