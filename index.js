@@ -223,7 +223,11 @@ async function getLongUrl(shortURL, chain_depth = 0) {
         return { fullURL: nextRedirect["fullURL"], shortURL: shortURL };
       }
     } else {
-      return { fullURL: fullURL, shortURL: shortURL };
+      if (fullURL === null) {
+        return { fullURL: shortURL, shortURL: shortURL };
+      } else {
+        return { fullURL: fullURL, shortURL: shortURL };
+      }
     }
   } catch (err) {
     log("Short URL " + shortURL + " -> ERROR");
