@@ -10,6 +10,7 @@ const fetch = require("node-fetch");
 
 const fullURLRegex = /https?:\/\/(([^\s]*)\.)?amazon\.([a-z.]{2,5})(\/d\/([^\s]*)|\/([^\s]*)\/?(?:dp|o|gp|-)\/)(aw\/d\/|product\/)?(B[0-9]{2}[0-9A-Z]{7}|[0-9]{9}(?:X|[0-9]))([^\s]*)/gi;
 const shortURLRegex = /https?:\/\/(([^\s]*)\.)?amzn\.to\/([0-9A-Za-z]+)/gi;
+const URLRegex = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/gi;
 
 if (!process.env.TELEGRAM_BOT_TOKEN) {
   console.log("Missing TELEGRAM_BOT_TOKEN env variable");
@@ -32,6 +33,9 @@ if (shorten_links && !bitly_token) {
 }
 
 const raw_links = process.env.RAW_LINKS && process.env.RAW_LINKS == "true";
+const check_for_redirects = process.env.CHECK_FOR_REDIRECTS && process.env.CHECK_FOR_REDIRECTS == "true";
+const check_for_redirect_chains = process.env.CHECK_FOR_REDIRECT_CHAINS && process.env.CHECK_FOR_REDIRECT_CHAINS == "true";
+const max_redirect_chain_depth = process.env.MAX_REDIRECT_CHAIN_DEPTH || 2
 
 var group_replacement_message;
 
@@ -198,10 +202,26 @@ function getASINFromFullUrl(url) {
   return match != null ? match[8] : url;
 }
 
-async function getLongUrl(shortURL) {
+async function getLongUrl(shortURL, chain_depth = 0) {
   try {
+    chain_depth++;
     let res = await fetch(shortURL, { redirect: "manual" });
-    return { fullURL: res.headers.get("location"), shortURL: shortURL };
+    let fullURL = res.headers.get("location");
+
+    if (check_for_redirect_chains && chain_depth < max_redirect_chain_depth) {
+      var nextRedirect = null;
+      if (fullURL !== null) {
+        nextRedirect = await getLongUrl(fullURL, chain_depth);
+      }
+
+      if (fullURL === null) {
+        return { fullURL: shortURL, shortURL: shortURL };
+      } else {
+        return { fullURL: nextRedirect["fullURL"], shortURL: shortURL };
+      }
+    } else {
+      return { fullURL: fullURL, shortURL: shortURL };
+    }
   } catch (err) {
     log("Short URL " + shortURL + " -> ERROR");
     return null;
@@ -247,6 +267,28 @@ bot.on("message", async (msg) => {
       !isGroup(msg.chat)
     ) {
       msg.text = replaceTextLinks(msg)
+
+
+      if (check_for_redirects) {
+        URLRegex.lastIndex = 0;
+        var longURLReplacements = [];
+        while ((match = URLRegex.exec(msg.text)) !== null) {
+          shortURLRegex.lastIndex = 0;
+          rawUrlRegex.lastIndex = 0;
+          if ((shortURLRegex.exec(match[0]) === null) && (rawUrlRegex.exec(match[0]) === null)) {
+            log(`Found non-Amazon URL ${match[0]}`)
+            let longURL = await getLongUrl(match[0]);
+            longURLReplacements.push(longURL);
+          }
+        }
+
+        longURLReplacements.forEach((element) => {
+          if (element.fullURL !== null) {
+            msg.text = msg.text.replace(element.shortURL, element.fullURL);
+          }
+        });
+      }
+
       shortURLRegex.lastIndex = 0;
       var replacements = [];
       var match;
