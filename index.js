@@ -33,9 +33,12 @@ if (shorten_links && !bitly_token) {
 }
 
 const raw_links = process.env.RAW_LINKS && process.env.RAW_LINKS == "true";
-const check_for_redirects = process.env.CHECK_FOR_REDIRECTS && process.env.CHECK_FOR_REDIRECTS == "true";
-const check_for_redirect_chains = process.env.CHECK_FOR_REDIRECT_CHAINS && process.env.CHECK_FOR_REDIRECT_CHAINS == "true";
-const max_redirect_chain_depth = process.env.MAX_REDIRECT_CHAIN_DEPTH || 2
+const check_for_redirects =
+  process.env.CHECK_FOR_REDIRECTS && process.env.CHECK_FOR_REDIRECTS == "true";
+const check_for_redirect_chains =
+  process.env.CHECK_FOR_REDIRECT_CHAINS &&
+  process.env.CHECK_FOR_REDIRECT_CHAINS == "true";
+const max_redirect_chain_depth = process.env.MAX_REDIRECT_CHAIN_DEPTH || 2;
 
 var group_replacement_message;
 
@@ -245,11 +248,11 @@ function replaceTextLinks(msg) {
         new_text += entity.url;
         offset_shift = entity.url.length - length;
 
-        new_text += msg.text.substring(offset + length)
+        new_text += msg.text.substring(offset + length);
 
         msg.text = new_text;
       }
-    })
+    });
 
     return msg.text;
   }
@@ -266,8 +269,7 @@ bot.on("message", async (msg) => {
         !user_ids_to_ignore.includes(from_id)) ||
       !isGroup(msg.chat)
     ) {
-      msg.text = replaceTextLinks(msg)
-
+      msg.text = replaceTextLinks(msg);
 
       if (check_for_redirects) {
         URLRegex.lastIndex = 0;
@@ -275,8 +277,11 @@ bot.on("message", async (msg) => {
         while ((match = URLRegex.exec(msg.text)) !== null) {
           shortURLRegex.lastIndex = 0;
           rawUrlRegex.lastIndex = 0;
-          if ((shortURLRegex.exec(match[0]) === null) && (rawUrlRegex.exec(match[0]) === null)) {
-            log(`Found non-Amazon URL ${match[0]}`)
+          if (
+            shortURLRegex.exec(match[0]) === null &&
+            rawUrlRegex.exec(match[0]) === null
+          ) {
+            log(`Found non-Amazon URL ${match[0]}`);
             let longURL = await getLongUrl(match[0]);
             longURLReplacements.push(longURL);
           }
