@@ -1,7 +1,9 @@
 /*
 telegram-bot-amazon
 
-Author: Luca Zorzi (@LucaTNT) | Nitesh Sahni(@nsniteshsahni)
+Author: Luca Zorzi (@LucaTNT)
+Contributers:
+ - Nitesh Sahni (@nsniteshsahni)
 License: MIT
 */
 
