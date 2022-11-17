@@ -7,6 +7,8 @@ Contributers:
 License: MIT
 */
 
+require('dotenv').config();
+
 const TelegramBot = require("node-telegram-bot-api");
 const fetch = require("node-fetch");
 
